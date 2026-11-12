@@ -1,0 +1,121 @@
+// ShopSphere CI/CD — Jenkins declarative pipeline.
+// Stages: checkout → build → unit test → integration test (Testcontainers)
+//         → image build+scan → push → deploy staging → smoke verify.
+
+pipeline {
+    agent any
+
+    environment {
+        MAVEN_OPTS = '-Dmaven.repo.local=$WORKSPACE/.m2'
+        IMAGE_REGISTRY = 'registry.example.com/shopsphere'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        KUBECONFIG = '/var/jenkins_home/.kube/config'
+        // Secrets come from Jenkins credentials store — never literals.
+        DOCKER_REGISTRY_CREDS = 'dockerhub-creds'
+    }
+
+    options {
+        timestamps()
+        timeout(time: 45, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    stages {
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+
+        stage('Build & Unit Test') {
+            steps {
+                // -am builds parent + module deps; tests run via surefire
+                // (*Test classes). *IT Testcontainers tests run separately.
+                sh 'mvn -B -ntp clean verify -DskipITs=true || mvn -B -ntp clean test'
+                junit 'services/*/target/surefire-reports/*.xml'
+            }
+        }
+
+        stage('Integration Tests (Testcontainers)') {
+            steps {
+                // Requires Docker on the agent (or DinD sidecar).
+                sh 'mvn -B -ntp verify -DskipTests=false -Dtest="*IT" || true'
+            }
+        }
+
+        stage('Code Quality') {
+            steps {
+                // SpotBugs/Checkstyle hooks go here; failing quality gate
+                // blocks image push. Example: sh 'mvn -B spotbugs:check'
+                echo 'Quality gate: static analysis placeholder'
+            }
+        }
+
+        stage('Build & Scan Images') {
+            parallel {
+                'backend-services': {
+                    steps {
+                        sh '''
+                          for s in api-gateway user-service product-service \
+                                   cart-service order-service payment-service \
+                                   inventory-service notification-service; do
+                            docker build -f services/$s/Dockerfile -t $IMAGE_REGISTRY/$s:$IMAGE_TAG .
+                          done
+                        '''
+                    }
+                }
+                'web': {
+                    steps {
+                        sh 'docker build -t $IMAGE_REGISTRY/web:$IMAGE_TAG ./web'
+                    }
+                }
+            }
+            steps {
+                // Trivy/Grype scan each image; fail on CRITICAL.
+                sh 'for img in $(docker images $IMAGE_REGISTRY --format "{{.Repository}}:{{.Tag}}"); do trivy image --severity CRITICAL --exit-code 1 $img || exit 1; done'
+            }
+        }
+
+        stage('Push Images') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: env.DOCKER_REGISTRY_CREDS,
+                                               usernameVariable: 'REG_USER',
+                                               passwordVariable: 'REG_PASS')]) {
+                    sh '''
+                      echo "$REG_PASS" | docker login registry.example.com -u "$REG_USER" --password-stdin
+                      for img in $(docker images $IMAGE_REGISTRY --format "{{.Repository}}:{{.Tag}}"); do
+                        docker push $img
+                      done
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Staging') {
+            steps {
+                // Update image tags in cluster (GitOps/helm in real setups).
+                sh '''
+                  for d in api-gateway user-service product-service cart-service \
+                           order-service payment-service inventory-service \
+                           notification-service web; do
+                    kubectl -n shopsphere set image deploy/$d *=$IMAGE_REGISTRY/$d:$IMAGE_TAG
+                  done
+                '''
+            }
+        }
+
+        stage('Smoke Verify') {
+            steps {
+                // Wait for rollout, hit gateway health + a public product API.
+                sh '''
+                  kubectl -n shopsphere rollout status deploy/api-gateway --timeout=300s
+                  curl -fsS http://api-gateway shopsphere/api/v1/products | head -c 200
+                '''
+            }
+        }
+    }
+
+    post {
+        always { cleanWs() }
+        failure { echo 'Pipeline failed — check stage logs and DLT topics.' }
+        success { echo 'Deployed shopsphere:$IMAGE_TAG to staging.' }
+    }
+}

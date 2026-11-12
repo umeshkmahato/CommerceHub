@@ -1,0 +1,24 @@
+# HPA — scale on CPU. Requires metrics-server in the cluster.
+# Product-service is read-heavy → scale aggressively; order/payment are
+# saga-bound → modest replicas (ordering matters more than throughput).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: product-service-hpa, namespace: shopsphere}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: product-service}
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: api-gateway-hpa, namespace: shopsphere}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: api-gateway}
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - type: Resource
+    resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}

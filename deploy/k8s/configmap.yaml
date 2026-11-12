@@ -1,0 +1,17 @@
+# Shared non-secret config. Secrets live in Secret objects — never here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shopsphere-config
+  namespace: shopsphere
+data:
+  KAFKA_BOOTSTRAP_SERVERS: "kafka shopsphere-kafka:9092"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  MYSQL_HOST: "mysql"
+  MYSQL_PORT: "3306"
+  JWT_ACCESS_TTL_MINUTES: "15"
+  JWT_REFRESH_TTL_DAYS: "7"
+  SPRING_PROFILES_ACTIVE: "k8s"

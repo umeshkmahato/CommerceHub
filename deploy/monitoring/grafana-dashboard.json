@@ -1,0 +1,44 @@
+{
+  "title": "ShopSphere Overview",
+  "uid": "shopsphere-overview",
+  "panels": [
+    {
+      "title": "HTTP request rate by service",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{
+        "expr": "sum by (application) (rate(http_server_requests_seconds_count[1m]))",
+        "legendFormat": "{{application}}"
+      }]
+    },
+    {
+      "title": "Error rate (5xx) %",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{
+        "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count[5m])) * 100",
+        "legendFormat": "5xx %"
+      }]
+    },
+    {
+      "title": "JVM heap used",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{
+        "expr": "jvm_memory_used_bytes{area=\"heap\"} / jvm_memory_max_bytes{area=\"heap\"} * 100",
+        "legendFormat": "{{application}} heap %"
+      }]
+    },
+    {
+      "title": "Kafka consumer lag",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [{
+        "expr": "kafka_consumer_group_lag",
+        "legendFormat": "{{topic}} / {{consumer_group}}"
+      }]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}
