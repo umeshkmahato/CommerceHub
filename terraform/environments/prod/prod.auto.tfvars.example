@@ -1,0 +1,8 @@
+project_id        = "your-gcp-project-id"
+region            = "us-central1"
+environment       = "prod"
+db_tier           = "db-custom-1-3840"
+db_disk_gb        = 50
+db_backup_enabled = true
+gke_node_count    = 3
+gke_machine_type  = "e2-standard-2"

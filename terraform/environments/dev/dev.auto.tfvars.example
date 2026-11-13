@@ -1,0 +1,10 @@
+# Copy values into TFC workspace variables or a local *.auto.tfvars
+# (gitignored). Never commit real project IDs/secrets.
+project_id       = "your-gcp-project-id"
+region           = "us-central1"
+environment      = "dev"
+db_tier          = "db-f1-micro"
+db_disk_gb       = 10
+db_backup_enabled = false
+gke_node_count   = 1
+gke_machine_type = "e2-medium"
