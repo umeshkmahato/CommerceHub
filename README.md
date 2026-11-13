@@ -40,7 +40,7 @@ Wait ~60s for Flyway migrations + Kafka topics, then:
 - **Storefront**: http://localhost
 - **Gateway API**: http://localhost:8080
 - **Swagger**: http://localhost:8080/... (per-service :8081–8087/swagger-ui.html)
-
+- **demo login**: demo@commercehub.com / Password123!
 ### Smoke test
 
 ```bash
